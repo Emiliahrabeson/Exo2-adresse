@@ -11,13 +11,23 @@ int dec ()
     scanf("%d", &n);
     return n;
 }
+
 void entrer(char adresse[100]) 
 {
     printf("CIDR : vous allez entrer un CIDR x.x.x.x/a\n\n");
-    printf("Avec a le nombre de bit pur le réseau et x.x.x.x l'adresse IP.\n\nOKEY");
+    printf("Avec a le nombre de bits pour le réseau et x.x.x.x l'adresse IP.\n\n");
     printf("\n\nEntrer une adresse IP : ");
     scanf("%s", adresse);
 }
+
+void char_int(char *chaine, int tableau[8]) 
+{
+    for (int i = 0; i < 8; i++) 
+    {
+        tableau[i] = chaine[i] - '0'; // Conversion du caractère '0' ou '1' en entier 0 ou 1
+    }
+}
+
 
 int bit() 
 {
@@ -27,47 +37,46 @@ int bit()
     return reseau;
 }
 
-void separer(char adresse[100], int reseau) 
+void separer(char adresse[100], int reseau, int *chiffre1, int *chiffre2, int *chiffre3, int *chiffre4) 
 {
     int i = 0;
-    int chiffre1, chiffre2, chiffre3, chiffre4;
     char *token = strtok(adresse, ".");
 
     if (token != NULL) 
     {
-        chiffre1 = atoi(token);
+        *chiffre1 = atoi(token);
         i++;
     }
 
     token = strtok(NULL, ".");
     if (token != NULL) 
     {
-        chiffre2 = atoi(token);
+        *chiffre2 = atoi(token);
         i++;
     }
 
     token = strtok(NULL, ".");
     if (token != NULL) 
     {
-        chiffre3 = atoi(token);
+        *chiffre3 = atoi(token);
         i++;
     }
 
-    token = strtok(NULL, ".");
+    token = strtok(NULL, "/");
     if (token != NULL) 
     {
-        chiffre4 = atoi(token);
+        *chiffre4 = atoi(token);
         i++;
     }
 
-    if (i != 4 || chiffre1 > 255 || chiffre2 > 255 || chiffre3 > 255 || chiffre4 > 255) 
+    if (i != 4 || *chiffre1 > 255 || *chiffre2 > 255 || *chiffre3 > 255 || *chiffre4 > 255) 
     {
         printf("Ce n'est pas une adresse IP valide !");
         exit(1);
     }
 
-    msr(adresse, reseau, chiffre1, chiffre2, chiffre3, chiffre4);
-    ad_broadcast(chiffre1, chiffre2, chiffre3, chiffre4, reseau);
+    msr(adresse, reseau, *chiffre1, *chiffre2, *chiffre3, *chiffre4);
+    ad_broadcast(*chiffre1, *chiffre2, *chiffre3, *chiffre4, reseau);
 }
 
 void ad_broadcast(int chiffre1, int chiffre2, int chiffre3, int chiffre4, int reseau)
@@ -172,45 +181,24 @@ void msr(char adresse[100], int reseau, int chiffre1, int chiffre2, int chiffre3
 
 void decimal(int x, int *chaine) 
 {
-    int puissances_de_2[8] = {128, 64, 32, 16, 8, 4, 2, 1};
-    for (int i = 0; i < 8; i++) 
+    for (int i = 7; i >= 0; i--) 
     {
-        if (x / puissances_de_2[i] % 2 == 1) 
-        {
-            chaine[i] = 1;
-        }
-        else 
-        {
-            chaine[i] = 0;
-        }
+        chaine[i] = (x & 1);
+        x = x >> 1;
     }
 }
 
 int binaire(int *tab) 
 {
-    int s = 0;
-    int puissances_de_2[8] = {128, 64, 32, 16, 8, 4, 2, 1};
-
+    int somme = 0;
     for (int i = 0; i < 8; i++) 
     {
-        if (tab[i] == 1) 
-        {
-            s += puissances_de_2[i];
-        }
+        somme += tab[i] * pow(2, 7 - i);
     }
-    return s;
+    return somme;
 }
 
-void char_int(char *chaine, int tableau[8]) 
-{
-    for (int i = 0; i < 8; i++) 
-    {
-        tableau[i] = chaine[i] - '0';
-    }
-}
-
-
-void decoupe(int n, int reseau) 
+void decoupe(int n, int reseau, int chiffre1, int chiffre2, int chiffre3, int chiffre4) 
 {
     int sous_reseau = 0;
     int temp = 1;
@@ -225,28 +213,33 @@ void decoupe(int n, int reseau)
     int nb_sreseaux = pow(2, sous_reseau);
     int a = pow(2, 32 - total_bit);
 
+    // Convertir l'adresse IP de départ en un entier pour faciliter les calculs
+    int ip_depart = (chiffre1 << 24) + (chiffre2 << 16) + (chiffre3 << 8) + chiffre4;
+
     for (int i = 0; i < n; i++) 
     {
-        int avant = i * a;
+        int avant = ip_depart + (i * a);  // Commence à partir de l'adresse réseau correcte
         int apres = avant + a - 1;
 
-        int reseau1 = avant / (256 * 256 * 256);
-        int reseau2 = (avant % (256 * 256 * 256)) / (256 * 256);
-        int reseau3 = (avant % (256 * 256)) / 256;
-        int reseau4 = avant % 256;
+        int reseau1 = (avant >> 24) & 0xFF;
+        int reseau2 = (avant >> 16) & 0xFF;
+        int reseau3 = (avant >> 8) & 0xFF;
+        int reseau4 = avant & 0xFF;
 
-        int broadcast1 = apres / (256 * 256 * 256);
-        int broadcast2 = (apres % (256 * 256 * 256)) / (256 * 256);
-        int broadcast3 = (apres% (256 * 256)) / 256;
-        int broadcast4 = apres % 256;
+        int broadcast1 = (apres >> 24) & 0xFF;
+        int broadcast2 = (apres >> 16) & 0xFF;
+        int broadcast3 = (apres >> 8) & 0xFF;
+        int broadcast4 = apres & 0xFF;
 
         printf("\nDécoupe %d :\n  Adresse réseau : %d.%d.%d.%d\n  Adresse de broadcast : %d.%d.%d.%d\n",
             i + 1, reseau1, reseau2, reseau3, reseau4, broadcast1, broadcast2, broadcast3, broadcast4);
     }
 }
+
+
 void machine(int reseau) 
 {
-    int bits_host = 32 - reseau;
-    int result = (int)pow(2, bits_host) - 2;
-    printf("Nombre de machines connectées : %d\n", result);
+    int nb_machines = pow(2, (32 - reseau)) - 2; 
+    printf("\nNombre de machines connectées : %d\n", nb_machines);
 }
+
